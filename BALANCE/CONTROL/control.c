@@ -1,96 +1,96 @@
 /***********************************************
-公司：轮趣科技（东莞）有限公司
-品牌：WHEELTEC
-官网：wheeltec.net
-淘宝店铺：shop114407458.taobao.com
-速卖通: https://minibalance.aliexpress.com/store/4455017
-版本：1.0
-修改时间：2021-12-09
+锟斤拷司锟斤拷锟斤拷趣锟狡硷拷锟斤拷锟斤拷莞锟斤拷锟斤拷锟睫癸拷司
+品锟狡ｏ拷WHEELTEC
+锟斤拷锟斤拷锟斤拷wheeltec.net
+锟皆憋拷锟斤拷锟教ｏ拷shop114407458.taobao.com
+锟斤拷锟斤拷通: https://minibalance.aliexpress.com/store/4455017
+锟芥本锟斤拷1.0
+锟睫革拷时锟戒：2021-12-09
 
 Brand: WHEELTEC
 Website: wheeltec.net
 Taobao shop: shop114407458.taobao.com
 Aliexpress: https://minibalance.aliexpress.com/store/4455017
 Version:1.0
-Update：2021-12-09
+Update锟斤拷2021-12-09
 
 All rights reserved
 ***********************************************/
 #include "control.h"
-int Balance_Pwm, Position_Pwm; // 目标角度PWM和目标位置PWM
-u8 Position_Target;			   // 用于位置控制的时间
-u8 Swing_up = 1;			   // 用于起摆、手动起摆时判断是否是第一次进入手动起摆函数
+int Balance_Pwm, Position_Pwm; // 目锟斤拷嵌锟絇WM锟斤拷目锟斤拷位锟斤拷PWM
+u8 Position_Target;			   // 锟斤拷锟斤拷位锟矫匡拷锟狡碉拷时锟斤拷
+u8 Swing_up = 1;			   // 锟斤拷锟斤拷锟斤拷凇锟斤拷侄锟斤拷锟斤拷时锟叫讹拷锟角凤拷锟角碉拷一锟轿斤拷锟斤拷锟街讹拷锟斤拷诤锟斤拷锟?
 
-// 角度PD控制用到的参数
-float Bias;				 // 角度偏差
-float Last_Bias, D_Bias; // PID相关变量
-int balance;			 // PWM返回值
+// 锟角讹拷PD锟斤拷锟斤拷锟矫碉拷锟侥诧拷锟斤拷
+float Bias;				 // 锟角讹拷偏锟斤拷
+float Last_Bias, D_Bias; // PID锟斤拷乇锟斤拷锟?
+int balance;			 // PWM锟斤拷锟斤拷值
 
-// 位置PD控制用到的参数
+// 位锟斤拷PD锟斤拷锟斤拷锟矫碉拷锟侥诧拷锟斤拷
 float Position_PWM, Last_Position, Position_Bias, Position_Differential;
 float Position_Least;
 
-// UAS-SMC控制用到的参数
-float k1 = 200, k2 = 2000; // 滑模运行中的系数
+// UAS-SMC锟斤拷锟斤拷锟矫碉拷锟侥诧拷锟斤拷
+float k1 = 200, k2 = 2000; // 锟斤拷模锟斤拷锟斤拷锟叫碉拷系锟斤拷
 int pos_d;
 float theta_d;
 
 float pos_last = 0;
 float theta_last = 0;
 
-float N;	// 鲁棒项
-int u_d;	// 期望的电压
-int u_real; // 输出的PWM值
+float N;	// 鲁锟斤拷锟斤拷
+int u_d;	// 锟斤拷锟斤拷锟侥碉拷压
+int u_real; // 锟斤拷锟斤拷锟絇WM值
 
-// 分段模糊系数
+// 锟街讹拷模锟斤拷系锟斤拷
 float k11[4] = {0.4, -0.2, -0.4, 0.2};
 float k12[4] = {0.8, 0.4, -0.8, -0.4};
 float k21[4] = {0.2, -0.1, -0.2, 0.1};
 float k22[4] = {0.4, 0.2, -0.4, -0.2};
 
-// 状态矩阵
+// 状态锟斤拷锟斤拷
 float A[4] = {-135.3752, -1.9188, 380.1344, 32.9066}; // A22,A23,A42,A43
-// 控制矩阵
+// 锟斤拷锟狡撅拷锟斤拷
 float B[2] = {10.5032, -29.4932}; // B21,B41
 
-u8 auto_run = 0;		  // 手动起摆或自动起摆标志位，默认是手动起摆
-u8 autorun_step0 = 0;	  // 自动起摆第0步，找中心点，等待起摆
-u8 autorun_step1 = 1;	  // 自动起摆第1步
-u8 autorun_step2 = 0;	  // 自动起摆第2步
-long Target_Position;	  // 目标位置
-float D_Angle_Balance;	  // 摆杆角度变化率
-long success_count = 0;	  // 摆杆在平衡位置的成功次数记录
-u8 success_flag = 0;	  // 自动起摆时，平衡成功，进入起摆后标志位
-long wait_count = 0;	  // 等待起摆成功后延时时间达到，获取起摆成功后位置
-long D_Count;			  // 用于获取摆杆角度变化率的中间计数变量
-float Last_Angle_Balance; // 用于获取摆杆角度变化率后的中间存放上一次角度
+u8 auto_run = 0;		  // 锟街讹拷锟斤拷诨锟斤拷远锟斤拷锟节憋拷志位锟斤拷默锟斤拷锟斤拷锟街讹拷锟斤拷锟?
+u8 autorun_step0 = 0;	  // 锟皆讹拷锟斤拷诘锟?0锟斤拷锟斤拷锟斤拷锟斤拷锟侥点，锟饺达拷锟斤拷锟?
+u8 autorun_step1 = 1;	  // 锟皆讹拷锟斤拷诘锟?1锟斤拷
+u8 autorun_step2 = 0;	  // 锟皆讹拷锟斤拷诘锟?2锟斤拷
+long Target_Position;	  // 目锟斤拷位锟斤拷
+float D_Angle_Balance;	  // 锟节杆角度变化锟斤拷
+long success_count = 0;	  // 锟节革拷锟斤拷平锟斤拷位锟矫的成癸拷锟斤拷锟斤拷锟斤拷录
+u8 success_flag = 0;	  // 锟皆讹拷锟斤拷锟绞憋拷锟狡斤拷锟缴癸拷锟斤拷锟斤拷锟斤拷锟斤拷诤锟斤拷志位
+long wait_count = 0;	  // 锟饺达拷锟斤拷诔晒锟斤拷锟斤拷锟绞笔憋拷锟斤到锟斤拷锟斤拷取锟斤拷诔晒锟斤拷锟轿伙拷锟?
+long D_Count;			  // 锟斤拷锟节伙拷取锟节杆角度变化锟绞碉拷锟叫硷拷锟斤拷锟斤拷锟斤拷锟?
+float Last_Angle_Balance; // 锟斤拷锟节伙拷取锟节杆角度变化锟绞猴拷锟斤拷屑锟斤拷锟斤拷锟揭伙拷谓嵌锟?
 
 u8 left, right;
 /**************************************************************************
-函数功能：所有的控制代码都在这里面
-		  TIM1控制的5ms定时中断
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷锟斤拷锟叫的匡拷锟狡达拷锟诫都锟斤拷锟斤拷锟斤拷锟斤拷
+		  TIM1锟斤拷锟狡碉拷5ms锟斤拷时锟叫讹拷
 **************************************************************************/
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if (htim == (&htim1)) // 确定指向的是TIM1中断发生的 //5ms定时中断,也就是控制频率为200Hz //实际上的发PWM的发送频率是10kHz
+	if (htim == (&htim1)) // 确锟斤拷指锟斤拷锟斤拷锟絋IM1锟叫断凤拷锟斤拷锟斤拷 //5ms锟斤拷时锟叫讹拷,也锟斤拷锟角匡拷锟斤拷频锟斤拷为200Hz //实锟斤拷锟较的凤拷PWM锟侥凤拷锟斤拷频锟斤拷锟斤拷10kHz
 	{
 		if (delay_flag == 1)
 		{
 			if (++delay_50 == 10)
-				delay_50 = 0, delay_flag = 0; //===为主函数提供50ms的精准延时  10次*5ms = 50ms。目的仅为让上位机波形传输稳定
+				delay_50 = 0, delay_flag = 0; //===为锟斤拷锟斤拷锟斤拷锟结供50ms锟侥撅拷准锟斤拷时  10锟斤拷*5ms = 50ms锟斤拷目锟侥斤拷为锟斤拷锟斤拷位锟斤拷锟斤拷锟轿达拷锟斤拷锟饺讹拷
 		}
-		Encoder = Read_Encoder(4);				//===更新编码器位置信息（当前位置）
-		Angle_Balance = Get_Adc_Average(3, 10); //===更新摆杆角度
-		Get_D_Angle_Balance();					//===获取摆杆角速度
+		Encoder = Read_Encoder(4);				//===锟斤拷锟铰憋拷锟斤拷锟斤拷位锟斤拷锟斤拷息锟斤拷锟斤拷前位锟矫ｏ拷
+		Angle_Balance = Get_Adc_Average(3, 10); //===锟斤拷锟铰摆杆角讹拷
+		Get_D_Angle_Balance();					//===锟斤拷取锟节杆斤拷锟劫讹拷
 
 		//Turn_Off(Voltage);
 		
-		if (auto_run == 1) // UAS_SMC控制模式(长按预留按键二即可)
+		if (auto_run == 1) // UAS_SMC锟斤拷锟斤拷模式(锟斤拷锟斤拷预锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷)
 		{
 			if (Flag_Stop == 0)
 			{
-				Turn_Off(Voltage); // 倾角、电压保护
-				if (Swing_up == 0) // 默认为1，这里使能其实没有被用到（一开始是不想按一下复位键就能进入滑膜，想用此来做特定的进入条件）
+				Turn_Off(Voltage); // 锟斤拷恰锟斤拷锟窖癸拷锟斤拷锟?
+				if (Swing_up == 0) // 默锟斤拷为1锟斤拷锟斤拷锟斤拷使锟斤拷锟斤拷实没锟叫憋拷锟矫碉拷锟斤拷一锟斤拷始锟角诧拷锟诫按一锟铰革拷位锟斤拷锟斤拷锟杰斤拷锟诫滑膜锟斤拷锟斤拷锟矫达拷锟斤拷锟斤拷锟截讹拷锟侥斤拷锟斤拷锟斤拷锟斤拷锟斤拷
 					Position_Zero = Encoder, pos_last = 0, theta_last = 0, Swing_up = 1;
 
 				if (Flag_Stop == 0)
@@ -103,18 +103,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		}
 		if (auto_run == 0)
 		{
-			Turn_Off(Voltage); // 倾角、电压保护
+			Turn_Off(Voltage); // 锟斤拷恰锟斤拷锟窖癸拷锟斤拷锟?
 			if (Swing_up == 0)
 				Position_Zero = Encoder, Last_Position = 0, Last_Bias = 0, Position_Target = 0, Swing_up = 1;
 
 			if (Flag_Stop == 0)
 			{
-				Balance_Pwm = Balance(Angle_Balance); //===角度PD控制
+				Balance_Pwm = Balance(Angle_Balance); //===锟角讹拷PD锟斤拷锟斤拷
 				if (++Position_Target > 4)
-					Position_Pwm = Position(Encoder), Position_Target = 0; //===位置PD控制 25ms进行一次位置控制
-				Moto = Balance_Pwm - Position_Pwm;						   //===计算出来的PWM
-				Xianfu_Pwm();											   //===PWM限幅 防止占空比超100%，保证系统稳定性
-				Set_Pwm(Moto);											   //===赋值给PWM的寄存器
+					Position_Pwm = Position(Encoder), Position_Target = 0; //===位锟斤拷PD锟斤拷锟斤拷 25ms锟斤拷锟斤拷一锟斤拷位锟矫匡拷锟斤拷
+				Moto = Balance_Pwm - Position_Pwm;						   //===锟斤拷锟斤拷锟斤拷锟斤拷锟絇WM
+				Xianfu_Pwm();											   //===PWM锟睫凤拷 锟斤拷止占锟秸比筹拷100%锟斤拷锟斤拷证系统锟饺讹拷锟斤拷
+				Set_Pwm(Moto);											   //===锟斤拷值锟斤拷PWM锟侥寄达拷锟斤拷
 			}
 		}
 
@@ -122,24 +122,24 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			Set_Pwm(0);
 	}
 	if (Flag_Stop == 0)
-		Led_Flash(100);			  //===LED闪烁指示系统正常运行
-	Voltage = Get_battery_volt(); //===读取电池电压
-	Key();						  //===扫描按键变化
+		Led_Flash(100);			  //===LED锟斤拷烁指示系统锟斤拷锟斤拷锟斤拷锟斤拷
+	Voltage = Get_battery_volt(); //===锟斤拷取锟斤拷氐锟窖?
+	Key();						  //===扫锟借按锟斤拷锟戒化
 }
 
 /**************************************************************************
-函数功能：将编码器值转化为位置
-入口参数：编码器值
-返回  值：位置
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷锟斤拷锟斤拷锟斤拷锟斤拷值转锟斤拷为位锟斤拷
+锟斤拷诓锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟街?
+锟斤拷锟斤拷  值锟斤拷位锟斤拷
 **************************************************************************/
 float pos_real(int pos_encoder)
 {
 	return (pos_encoder * K);
 }
 /**************************************************************************
-函数功能：ADC值转化为角度
-入口参数：ADC电压值、未转化角度
-返回  值：角度值
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷ADC值转锟斤拷为锟角讹拷
+锟斤拷诓锟斤拷锟斤拷锟紸DC锟斤拷压值锟斤拷未转锟斤拷锟角讹拷
+锟斤拷锟斤拷  值锟斤拷锟角讹拷值
 **************************************************************************/
 float angle_real(float angel_ADC)
 {
@@ -147,19 +147,24 @@ float angle_real(float angel_ADC)
 }
 
 /**************************************************************************
-函数功能：UAS-SMC控制
-入口参数：角度
-返回  值：平衡控制PWM
+????:??????? (UAS-SMC) - ????????
 **************************************************************************/
 int UAS_SMC_Control(float theta, int pos)
 {
-	float theta_e, theta_dot, theta_e_dot; // 误差
-	float pos_e, pos_dot, pos_e_dot;	   // 位置
+	float theta_e, theta_dot, theta_e_dot; 
+	float pos_e, pos_dot, pos_e_dot;	   
 
-	// [修复 Bug 2]：静态变量用于微分项的低通滤波
+	// 1. [????]:??????,?????? (?0.3??0.15)
 	static float last_pos_dot = 0;
 	static float last_theta_dot = 0;
-	const float alpha = 0.3f; // 滤波系数，可以微调，越小平滑度越高
+	const float alpha = 0.15f; 
+
+    // 2. [????]:???????
+    static float pos_integral = 0;
+
+    // 3. [????]:???????????,??????
+    float k1 = 100.0f;  // ?200
+    float k2 = 1200.0f; // ?2000
 
 	theta_d = ZHONGZHI;
 	pos_d = Position_Zero;
@@ -173,27 +178,32 @@ int UAS_SMC_Control(float theta, int pos)
 	float s1[2] = {0};
 	float s2[2] = {0};
 
-	float m1[2] = {0}, m2[2] = {0}; // 当前分段模型系数
+	float m1[2] = {0}, m2[2] = {0}; 
 
-	// 1. 计算原始微分
+	// ????
 	float raw_pos_dot = (p - pos_last) / TS;
 	float raw_theta_dot = (a - theta_last) / TS;
 
-	// 2. 应用一阶低通滤波
+	// ????
 	pos_dot = (1.0f - alpha) * last_pos_dot + alpha * raw_pos_dot;
 	theta_dot = (1.0f - alpha) * last_theta_dot + alpha * raw_theta_dot;
 
 	last_pos_dot = pos_dot;
 	last_theta_dot = theta_dot;
 
-	fx1 = A[0] * pos_dot + A[1] * a; // 根据状态方程求解出对应的系统的误差模型和电压值的映射
+	fx1 = A[0] * pos_dot + A[1] * a; 
 	fx2 = A[2] * pos_dot + A[3] * a;
 
 	pos_e = p - p_d;
-	pos_e_dot = pos_dot; // 直接把参考值作为零来求导得到
+	pos_e_dot = pos_dot; 
 
 	theta_e = a - a_d;
 	theta_e_dot = theta_dot;
+
+    // --- ????? (?????????) ---
+    pos_integral += pos_e * TS;
+    if(pos_integral > 0.5f) pos_integral = 0.5f;     // ????
+    if(pos_integral < -0.5f) pos_integral = -0.5f;
 
 	s1[0] = pos_e + 1.5f * pos_e_dot;
 	s1[1] = pos_e + (1.0f / 6.0f) * pos_e_dot;
@@ -201,6 +211,7 @@ int UAS_SMC_Control(float theta, int pos)
 	s2[0] = theta_e + 1.5f * theta_e_dot;
 	s2[1] = theta_e + (1.0f / 6.0f) * theta_e_dot;
 
+	// ??? (??????????)
 	N = k1 * fabsf(pos_e) + k2 * fabsf(theta_e);
 
 	if (s1[0] < 0 && s1[1] < 0)
@@ -224,84 +235,87 @@ int UAS_SMC_Control(float theta, int pos)
 	pos_last = p;
 	theta_last = a;
 
-	float den = (m1[1] * gx1 + m2[1] * gx2); // 分母为零保护（理论上不会到0）
+	float den = (m1[1] * gx1 + m2[1] * gx2); 
 	if (fabsf(den) < 1e-6f)
 		den = (den >= 0 ? 1e-6f : -1e-6f);
-	u_d = (1.0f / den) * (-(m1[0] * pos_e_dot + m2[0] * theta_e_dot) - (m1[1] * fx1 + m2[1] * fx2) + N);
+	
+    u_d = (1.0f / den) * (-(m1[0] * pos_e_dot + m2[0] * theta_e_dot) - (m1[1] * fx1 + m2[1] * fx2) + N);
 
-	u_real = (int)(U2PWM * u_d);
-	return -u_real; // 注意有个负号，这个负号是因为当前设定的角度方向（向前为正）和电机输出PWM的方向（应向前却为负）不一致
+    // --- ????????????? ---
+    // ??? 1200.0f ???????,???????????? (??1500)
+    u_real = (int)(U2PWM * u_d + 1200.0f * pos_integral);
+	
+    return -u_real; 
 }
-
 /**************************************************************************
-函数功能：角度PD控制
-入口参数：角度
-返回  值：平衡控制PWM
-作    者：平衡小车之家
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷锟角讹拷PD锟斤拷锟斤拷
+锟斤拷诓锟斤拷锟斤拷锟斤拷嵌锟?
+锟斤拷锟斤拷  值锟斤拷平锟斤拷锟斤拷锟絇WM
+锟斤拷    锟竭ｏ拷平锟斤拷小锟斤拷之锟斤拷
 **************************************************************************/
 int Balance(float Angle)
 {
-	Bias = Angle - ZHONGZHI;							// 求出平衡的角度中值和机械的重合，ZHONGZHI是机械原点，
-	D_Bias = Bias - Last_Bias;							// 求出偏差的微分 进行微分控制
-	balance = -Balance_KP * Bias - D_Bias * Balance_KD; //===计算平衡控制的电机PWM  PD控制
-	Last_Bias = Bias;									// 保存上一次的偏差
+	Bias = Angle - ZHONGZHI;							// 锟斤拷锟狡斤拷锟侥角讹拷锟斤拷值锟酵伙拷械锟斤拷锟截合ｏ拷ZHONGZHI锟角伙拷械原锟姐，
+	D_Bias = Bias - Last_Bias;							// 锟斤拷锟狡?锟斤拷锟轿?锟斤拷 锟斤拷锟斤拷微锟街匡拷锟斤拷
+	balance = -Balance_KP * Bias - D_Bias * Balance_KD; //===锟斤拷锟斤拷平锟斤拷锟斤拷频牡锟斤拷PWM  PD锟斤拷锟斤拷
+	Last_Bias = Bias;									// 锟斤拷锟斤拷锟斤拷一锟轿碉拷偏锟斤拷
 	return balance;
 }
 
 /**************************************************************************
-函数功能：位置PD控制
-入口参数：编码器
-返回  值：位置控制PWM
-作    者：平衡小车之家
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷位锟斤拷PD锟斤拷锟斤拷
+锟斤拷诓锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟?
+锟斤拷锟斤拷  值锟斤拷位锟矫匡拷锟斤拷PWM
+锟斤拷    锟竭ｏ拷平锟斤拷小锟斤拷之锟斤拷
 **************************************************************************/
 int Position(int Encoder)
 {
-	Position_Least = Encoder - Position_Zero; //===求出平衡位置
+	Position_Least = Encoder - Position_Zero; //===锟斤拷锟狡斤拷锟轿伙拷锟?
 	Position_Bias *= 0.8;
-	Position_Bias += Position_Least * 0.2; //===一阶低通滤波器
+	Position_Bias += Position_Least * 0.2; //===一锟阶碉拷通锟剿诧拷锟斤拷
 	Position_Differential = Position_Bias - Last_Position;
 	Last_Position = Position_Bias;
-	Position_PWM = Position_Bias * Position_KP + Position_Differential * Position_KD; //===速度控制
-																					  //    Position_PWM=Position_Bias*(Position_KP+Basics_Position_KP)/2+Position_Differential*(Position_KD+Basics_Position_KD)/2; //===位置控制
+	Position_PWM = Position_Bias * Position_KP + Position_Differential * Position_KD; //===锟劫度匡拷锟斤拷
+																					  //    Position_PWM=Position_Bias*(Position_KP+Basics_Position_KP)/2+Position_Differential*(Position_KD+Basics_Position_KD)/2; //===位锟矫匡拷锟斤拷
 	return Position_PWM;
 }
 
 /**************************************************************************
-函数功能：赋值给PWM的寄存器
-入口参数：PWM
-返回  值：无
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷锟斤拷值锟斤拷PWM锟侥寄达拷锟斤拷
+锟斤拷诓锟斤拷锟斤拷锟絇WM
+锟斤拷锟斤拷  值锟斤拷锟斤拷
 **************************************************************************/
 void Set_Pwm(int moto)
 {
 	if (moto < 0)
-		BIN2 = 1, BIN1 = 0; // 转向判断
+		BIN2 = 1, BIN1 = 0; // 转锟斤拷锟叫讹拷
 	else
 		BIN2 = 0, BIN1 = 1;
 	PWMB = myabs(moto);
 }
 
 /**************************************************************************
-函数功能：限制PWM赋值
-入口参数：无
-返回  值：无
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷锟斤拷锟斤拷PWM锟斤拷值
+锟斤拷诓锟斤拷锟斤拷锟斤拷锟?
+锟斤拷锟斤拷  值锟斤拷锟斤拷
 **************************************************************************/
 void Xianfu_Pwm(void)
 {
-	int Amplitude = 6900; //===PWM满幅是7200 限制在6900
+	int Amplitude = 6900; //===PWM锟斤拷锟斤拷锟斤拷7200 锟斤拷锟斤拷锟斤拷6900
 	if (Moto < -Amplitude)
 		Moto = -Amplitude;
 	if (Moto > Amplitude)
 		Moto = Amplitude;
 }
 /**************************************************************************
-函数功能：按键修改控制摆杆的位置
-入口参数：无
-返回  值：无
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷锟斤拷锟斤拷锟睫改匡拷锟狡摆杆碉拷位锟斤拷
+锟斤拷诓锟斤拷锟斤拷锟斤拷锟?
+锟斤拷锟斤拷  值锟斤拷锟斤拷
 **************************************************************************/
 void Key(void)
 {
-	// 本产品使用的电机13线霍尔编码器，减速比20，使用定时器4倍频，轮子转一圈，编码器读数是 13*4*20 = 1040
-	int position = 1040; // 目标位置 小车原始位置是10000  转一圈是1040 也就是如果小车往左转，原本是摆杆Z向转一圈，这里减1040，就是右边
+	// 锟斤拷锟斤拷品使锟矫的碉拷锟?13锟竭伙拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟劫憋拷20锟斤拷使锟矫讹拷时锟斤拷4锟斤拷频锟斤拷锟斤拷锟斤拷转一圈锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 13*4*20 = 1040
+	int position = 1040; // 目锟斤拷位锟斤拷 小锟斤拷原始位锟斤拷锟斤拷10000  转一圈锟斤拷1040 也锟斤拷锟斤拷锟斤拷锟叫★拷锟斤拷锟斤拷锟阶?锟斤拷原锟斤拷锟角摆革拷Z锟斤拷转一圈锟斤拷锟斤拷锟斤拷锟?1040锟斤拷锟斤拷锟斤拷锟揭憋拷
 	static int tmp, flag, count;
 	tmp = click_N_Double(100);
 
@@ -310,14 +324,14 @@ void Key(void)
 	if (tmp == 2)
 		flag = 2; //--
 
-	if (flag == 1) // 摆杆往左边方向运动
+	if (flag == 1) // 锟节革拷锟斤拷锟斤拷叻锟斤拷锟斤拷硕锟?
 	{
 		Position_Zero += 4;
 		count += 4;
 		if (count == position)
 			flag = 0, count = 0;
 	}
-	if (flag == 2) // 摆杆往反方向运动
+	if (flag == 2) // 锟节革拷锟斤拷锟斤拷锟斤拷锟斤拷锟剿讹拷
 	{
 		Position_Zero -= 4;
 		count += 4;
@@ -331,12 +345,12 @@ void Key(void)
 		auto_run = !auto_run;
 	}
 
-	if (Flag_Stop == 1) // 在电机停止的时候长按预留按键二切换模式并把蓝色LED灯作为指示灯，亮起时是自动起摆
+	if (Flag_Stop == 1) // 锟节碉拷锟酵Ｖ癸拷锟绞憋拷虺ぐ锟皆わ拷锟斤拷锟斤拷锟斤拷锟斤拷谢锟侥Ｊ斤拷锟斤拷锟斤拷锟缴獿ED锟斤拷锟斤拷为指示锟狡ｏ拷锟斤拷锟斤拷时锟斤拷锟皆讹拷锟斤拷锟?
 	{
 		if (auto_run == 1)
 		{
-			// 显示信息
-			// 自动起摆模式
+			// 锟斤拷示锟斤拷息
+			// 锟皆讹拷锟斤拷锟侥Ｊ?
 			LED = 0;
 		}
 
@@ -346,14 +360,14 @@ void Key(void)
 }
 
 /**************************************************************************
-函数功能：异常关闭电机
-入口参数：电压
-返回  值：1：异常  0：正常
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷锟届常锟截闭碉拷锟?
+锟斤拷诓锟斤拷锟斤拷锟斤拷锟窖?
+锟斤拷锟斤拷  值锟斤拷1锟斤拷锟届常  0锟斤拷锟斤拷锟斤拷
 **************************************************************************/
 u8 Turn_Off(int voltage)
 {
 	u8 temp;
-	if (Flag_Stop == 1) // 电池电压过低，关闭电机
+	if (Flag_Stop == 1) // 锟斤拷氐锟窖癸拷锟斤拷停锟斤拷乇盏锟斤拷
 	{
 		Flag_Stop = 1;
 		temp = 1;
@@ -373,9 +387,9 @@ u8 Turn_Off(int voltage)
 }
 
 /**************************************************************************
-函数功能：绝对值函数
-入口参数：int
-返回  值：unsigned int
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷锟斤拷锟斤拷值锟斤拷锟斤拷
+锟斤拷诓锟斤拷锟斤拷锟絠nt
+锟斤拷锟斤拷  值锟斤拷unsigned int
 **************************************************************************/
 int myabs(int a)
 {
@@ -388,50 +402,50 @@ int myabs(int a)
 }
 
 /**************************************************************************
-函数功能：找位标定
-入口参数：无
-返回  值：无
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷锟斤拷位锟疥定
+锟斤拷诓锟斤拷锟斤拷锟斤拷锟?
+锟斤拷锟斤拷  值锟斤拷锟斤拷
 **************************************************************************/
 void Find_Zero(void)
 {
 	static float count;
 
-	// 初始化时 autorun_step0=0，必然被执行
-	if (autorun_step0 == 0) // 回到零位
+	// 锟斤拷始锟斤拷时 autorun_step0=0锟斤拷锟斤拷然锟斤拷执锟斤拷
+	if (autorun_step0 == 0) // 锟截碉拷锟斤拷位
 	{
-		Position_Zero = POSITION_MIDDLE; // 设置目标为中间位置
+		Position_Zero = POSITION_MIDDLE; // 锟斤拷锟斤拷目锟斤拷为锟叫硷拷位锟斤拷
 
-		// 顺序pid控制，让摆杆绝对稳定向下，目标角度是初始角，目标位置也是初始位置，
-		Balance_Pwm = Balance(Angle_Balance + 2070) / 8; // 角度PD控制
+		// 顺锟斤拷pid锟斤拷锟狡ｏ拷锟矫摆杆撅拷锟斤拷锟饺讹拷锟斤拷锟铰ｏ拷目锟斤拷嵌锟斤拷浅锟绞硷拷牵锟侥匡拷锟轿伙拷锟揭诧拷浅锟绞嘉伙拷茫锟?
+		Balance_Pwm = Balance(Angle_Balance + 2070) / 8; // 锟角讹拷PD锟斤拷锟斤拷
 		Position_Pwm = Pre_Position(Encoder);
 
-		// 防止偏离零位太多，起摆PID控制会撞向边缘
+		// 锟斤拷止偏锟斤拷锟斤拷位太锟洁，锟斤拷锟絇ID锟斤拷锟狡伙拷撞锟斤拷锟皆?
 		if (Encoder < 7950)
-			Moto = Incremental_PI(Encoder, POSITION_MIDDLE); // 位置闭环控制;//离开边缘地方才开始PID起摆
+			Moto = Incremental_PI(Encoder, POSITION_MIDDLE); // 位锟矫闭伙拷锟斤拷锟斤拷;//锟诫开锟斤拷缘锟截凤拷锟脚匡拷始PID锟斤拷锟?
 		else
-			Moto = -Balance_Pwm + Position_Pwm; // 获取PD控制出来的PWM
+			Moto = -Balance_Pwm + Position_Pwm; // 锟斤拷取PD锟斤拷锟狡筹拷锟斤拷锟斤拷PWM
 
-		// 判断角度和位置是否在原始位置，是在 检测到200次 在原始位置，认为稳定等起摆
-		// 起摆期间，把刚才的标志位置一，把pwm值全置零，并在Target_Position=POSITION_MIDDL-668设置起摆时的第一个目标点，使autorun_step0=1不再进入此函数
+		// 锟叫断角度猴拷位锟斤拷锟角凤拷锟斤拷原始位锟矫ｏ拷锟斤拷锟斤拷 锟斤拷獾?200锟斤拷 锟斤拷原始位锟矫ｏ拷锟斤拷为锟饺讹拷锟斤拷锟斤拷锟?
+		// 锟斤拷锟斤拷诩洌?锟窖刚才的憋拷志位锟斤拷一锟斤拷锟斤拷pwm值全锟斤拷锟姐，锟斤拷锟斤拷Target_Position=POSITION_MIDDL-668锟斤拷锟斤拷锟斤拷锟绞憋拷牡锟揭伙拷锟侥匡拷锟姐，使autorun_step0=1锟斤拷锟劫斤拷锟斤拷撕锟斤拷锟?
 		if (Angle_Balance < (ANGLE_ORIGIN + 300) && Angle_Balance > (ANGLE_ORIGIN - 300) && (Encoder > (POSITION_MIDDLE - 50) && Encoder < (POSITION_MIDDLE + 50)))
 			count++;
 		if (Angle_Balance < (ANGLE_ORIGIN + 300) && Angle_Balance > (ANGLE_ORIGIN - 300))
 			count += 0.1;
 		if (count > 200)
-			autorun_step0 = 1, autorun_step1 = 0, Moto = 0, Target_Position = POSITION_MIDDLE - 668; // 摆杆运动到中间位置，停止 //设置目标位置，准备晃起
+			autorun_step0 = 1, autorun_step1 = 0, Moto = 0, Target_Position = POSITION_MIDDLE - 668; // 锟节革拷锟剿讹拷锟斤拷锟叫硷拷位锟矫ｏ拷停止 //锟斤拷锟斤拷目锟斤拷位锟矫ｏ拷准锟斤拷锟斤拷锟斤拷
 	}
 
-	// 适当速度限幅，防止撞向边缘或者闭环位置控制过快
+	// 锟绞碉拷锟劫讹拷锟睫凤拷锟斤拷锟斤拷止撞锟斤拷锟皆碉拷锟斤拷弑栈锟轿伙拷每锟斤拷乒锟斤拷锟?
 	if (Moto > 2500)
-		Moto = 2500; // 限制位置闭环控制过程的速度
+		Moto = 2500; // 锟斤拷锟斤拷位锟矫闭伙拷锟斤拷锟狡癸拷锟教碉拷锟劫讹拷
 	if (Moto < -2500)
 		Moto = -2500;
-	Set_Pwm(Moto); // 控制电机
+	Set_Pwm(Moto); // 锟斤拷锟狡碉拷锟?
 }
 /**************************************************************************
-函数功能：自动起摆
-入口参数：无
-返回  值：无
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷锟皆讹拷锟斤拷锟?
+锟斤拷诓锟斤拷锟斤拷锟斤拷锟?
+锟斤拷锟斤拷  值锟斤拷锟斤拷
 **************************************************************************/
 void Auto_run(void)
 {
@@ -439,9 +453,9 @@ void Auto_run(void)
 	static u8 help_count = 0;
 	static u16 pid_adjust = 0;
 
-	if (autorun_step1 == 0) // 自动起摆第一步   （起摆一直执行，一旦起摆进入起摆）
+	if (autorun_step1 == 0) // 锟皆讹拷锟斤拷诘锟揭伙拷锟?   锟斤拷锟斤拷锟揭恢敝达拷校锟揭伙拷锟斤拷锟节斤拷锟斤拷锟斤拷冢锟?
 	{
-		// 判断应该往哪边晃动
+		// 锟叫讹拷应锟斤拷锟斤拷锟侥边晃讹拷
 		if ((Angle_Balance > (ANGLE_ORIGIN - 120) && Angle_Balance < (ANGLE_ORIGIN + 120)))
 		{
 			if (D_Angle_Balance <= 0)
@@ -450,7 +464,7 @@ void Auto_run(void)
 				left = 1;
 		}
 
-		// 判断到摆杆回到初始位置时应该给速度和位置
+		// 锟叫断碉拷锟节杆回碉拷锟斤拷始位锟斤拷时应锟矫革拷锟劫度猴拷位锟斤拷
 		if (left == 1)
 		{
 			if ((Angle_Balance > (ANGLE_ORIGIN - 50) && Angle_Balance < (ANGLE_ORIGIN + 50)))
@@ -458,7 +472,7 @@ void Auto_run(void)
 				left = 0;
 				Target_Position = POSITION_MIDDLE + 800;
 				if (speed > 1)
-					Target_Position = POSITION_MIDDLE + 160; // 让摆杆回去时一直直给到刚好起摆
+					Target_Position = POSITION_MIDDLE + 160; // 锟矫摆杆伙拷去时一直直锟斤拷锟斤拷锟秸猴拷锟斤拷锟?
 			}
 		}
 
@@ -469,20 +483,20 @@ void Auto_run(void)
 				right = 0;
 				Target_Position = POSITION_MIDDLE - 482;
 				if (speed > 1)
-					Target_Position = POSITION_MIDDLE - 160; // 让摆杆回去时一直直给到刚好起摆
+					Target_Position = POSITION_MIDDLE - 160; // 锟矫摆杆伙拷去时一直直锟斤拷锟斤拷锟秸猴拷锟斤拷锟?
 			}
 		}
 
-		// 位置闭环控制
+		// 位锟矫闭伙拷锟斤拷锟斤拷
 		Moto = Position_PID(Encoder, Target_Position);
 
-		// 摆杆已经跨越过平衡点附近，下次进入判断角度阶段。
+		// 锟节革拷锟窖撅拷锟斤拷越锟斤拷平锟斤拷愀斤拷锟斤拷锟斤拷麓谓锟斤拷锟斤拷卸辖嵌冉锥巍锟?
 		if (Angle_Balance < (ANGLE_MIDDLE + 385) && Angle_Balance > (ANGLE_MIDDLE - 385))
 		{
 			speed++;
 		}
 
-		// 判断当前角度是否在起摆期，位置要好，位置不能在边缘并且角度在平衡点附近且角速度接近于0
+		// 锟叫断碉拷前锟角讹拷锟角凤拷锟斤拷锟斤拷锟斤拷冢锟轿伙拷锟揭?锟矫ｏ拷位锟矫诧拷锟斤拷锟节憋拷缘锟斤拷锟揭角讹拷锟斤拷平锟斤拷愀斤拷锟斤拷医锟斤拷俣冉咏锟斤拷锟?0
 		if (Angle_Balance < (ANGLE_MIDDLE + 120) && Angle_Balance > (ANGLE_MIDDLE - 120) && (Encoder > 6300 && Encoder < 9300) && (D_Angle_Balance > -30 && D_Angle_Balance < 30))
 		{
 			speed++;
@@ -490,33 +504,33 @@ void Auto_run(void)
 		}
 
 		else
-			success_count = 0; // 只要没有在这个范围内，说明起摆要失败，等待下次判断
+			success_count = 0; // 只要没锟斤拷锟斤拷锟斤拷锟斤拷锟轿э拷冢锟剿碉拷锟斤拷锟斤拷要失锟杰ｏ拷锟饺达拷锟铰达拷锟叫讹拷
 
-		// 经过3次的检测如果还是在起摆期内，就进入起摆后起步pid
+		// 锟斤拷锟斤拷3锟轿的硷拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷冢锟斤拷徒锟斤拷锟斤拷锟节猴拷锟斤拷pid
 		if (success_count > 3)
 		{
 			autorun_step1 = 1, success_flag = 1;
-			Balance_KP = 210, Balance_KD = 150, Position_KP = 8, Position_KD = 130; // 自动起摆起步pid参数
+			Balance_KP = 210, Balance_KD = 150, Position_KP = 8, Position_KD = 130; // 锟皆讹拷锟斤拷锟斤拷锟絧id锟斤拷锟斤拷
 		}
 
-		// 限幅
+		// 锟睫凤拷
 		if (Moto > 4100)
-			Moto = 4100; // 限制位置闭环控制过程的速度
+			Moto = 4100; // 锟斤拷锟斤拷位锟矫闭伙拷锟斤拷锟狡癸拷锟教碉拷锟劫讹拷
 		if (Moto < -5100)
 			Moto = -5100;
 	}
 
-	// 开始执行起步起摆起步进入起步起摆
-	else if (success_flag == 1) // 到最高点，接管
+	// 锟斤拷始执锟斤拷锟斤拷锟斤拷锟斤拷鸩浇锟斤拷锟斤拷锟斤拷锟斤拷
+	else if (success_flag == 1) // 锟斤拷锟斤拷叩悖?锟接癸拷
 	{
 
 		if (wait_count == 0)
-			Position_Zero = Encoder;		  // 刚起摆时先获取当前位置作为平衡的目标
-		Balance_Pwm = Balance(Angle_Balance); //===角度PD控制
+			Position_Zero = Encoder;		  // 锟斤拷锟斤拷锟绞憋拷然锟饺★拷锟角拔伙拷锟斤拷锟轿?平锟斤拷锟侥匡拷锟?
+		Balance_Pwm = Balance(Angle_Balance); //===锟角讹拷PD锟斤拷锟斤拷
 		if (++Position_Target > 4)
-			Position_Pwm = Position(Encoder), Position_Target = 0; //===位置PD控制 25ms进行一次位置控制
+			Position_Pwm = Position(Encoder), Position_Target = 0; //===位锟斤拷PD锟斤拷锟斤拷 25ms锟斤拷锟斤拷一锟斤拷位锟矫匡拷锟斤拷
 
-		// 经过一段时间后再让摆杆回回到中间位
+		// 锟斤拷锟斤拷一锟斤拷时锟斤拷锟斤拷锟斤拷冒诟嘶鼗氐锟斤拷屑锟轿?
 		wait_count++;
 		if (wait_count > 100 && wait_count < 2000)
 		{
@@ -526,13 +540,13 @@ void Auto_run(void)
 				Position_Zero++;
 		}
 		if (wait_count > 2000)
-			wait_count = 2001; // 卡住计数变量防止其溢出
+			wait_count = 2001; // 锟斤拷住锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷止锟斤拷锟斤拷锟?
 
-		// 起摆后的辅助pid阶段	 起步参数起摆需要让pid稍微大一点 小车到起摆成功后能起摆后，开始用起步pid慢慢渐变到起摆起摆起摆的参数值
+		// 锟斤拷诤锟侥革拷锟斤拷pid锟阶讹拷	 锟金步诧拷锟斤拷锟斤拷锟斤拷锟揭?锟斤拷pid锟斤拷微锟斤拷一锟斤拷 小锟斤拷锟斤拷锟斤拷诔晒锟斤拷锟斤拷锟斤拷锟节后，匡拷始锟斤拷锟斤拷pid锟斤拷锟斤拷锟斤拷锟戒到锟斤拷锟斤拷锟斤拷锟斤拷诘牟锟斤拷锟街?
 		if (help_count == 0)
 		{
 			pid_adjust++;
-			if (pid_adjust % 100 == 0) // 参数变大 防止起摆后失控
+			if (pid_adjust % 100 == 0) // 锟斤拷锟斤拷锟斤拷锟? 锟斤拷止锟斤拷诤锟绞э拷锟?
 			{
 				Balance_KP += 10;
 				Balance_KD += 10;
@@ -548,55 +562,55 @@ void Auto_run(void)
 			if (Position_KD > 300)
 				Position_KD = 300;
 			if (Balance_KP == 400 && Balance_KD == 400 && Position_KP == 20 && Position_KD == 300)
-				help_count = 1; // 辅助起步达到最佳释放pid阀值限幅进入平时稳定通过按键改变pid状态
+				help_count = 1; // 锟斤拷锟斤拷锟金步达到锟斤拷锟斤拷头锟絧id锟斤拷值锟睫凤拷锟斤拷锟斤拷平时锟饺讹拷通锟斤拷锟斤拷锟斤拷锟侥憋拷pid状态
 		}
 
-		// 起步起步后的接管起效
-		Moto = Balance_Pwm - Position_Pwm; // 获取PD控制出来的PWM
+		// 锟斤拷锟金步猴拷慕庸锟斤拷锟叫?
+		Moto = Balance_Pwm - Position_Pwm; // 锟斤拷取PD锟斤拷锟狡筹拷锟斤拷锟斤拷PWM
 	}
 }
 /**************************************************************************
-函数功能：增量PI控制器
-入口参数：编码器测量值，目标速度
-返回  值：电机PWM
-根据增量式离散PID公式
-pwm+=Kp[e（k）-e(k-1)]+Ki*e(k)+Kd[e(k)-2e(k-1)+e(k-2)]
-e(k)代表本次偏差
-e(k-1)代表上一次的偏差  以此类推
-pwm代表增量输出
-在我们的速度控制闭环系统里面，只使用PI控制
-pwm+=Kp[e（k）-e(k-1)]+Ki*e(k)
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷锟斤拷锟斤拷PI锟斤拷锟斤拷锟斤拷
+锟斤拷诓锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟街碉拷锟侥匡拷锟斤拷俣锟?
+锟斤拷锟斤拷  值锟斤拷锟斤拷锟絇WM
+锟斤拷锟斤拷锟斤拷锟斤拷式锟斤拷散PID锟斤拷式
+pwm+=Kp[e锟斤拷k锟斤拷-e(k-1)]+Ki*e(k)+Kd[e(k)-2e(k-1)+e(k-2)]
+e(k)锟斤拷锟斤拷锟斤拷锟斤拷偏锟斤拷
+e(k-1)锟斤拷锟斤拷锟斤拷一锟轿碉拷偏锟斤拷  锟皆达拷锟斤拷锟斤拷
+pwm锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟?
+锟斤拷锟斤拷锟角碉拷锟劫度匡拷锟狡闭伙拷系统锟斤拷锟芥，只使锟斤拷PI锟斤拷锟斤拷
+pwm+=Kp[e锟斤拷k锟斤拷-e(k-1)]+Ki*e(k)
 **************************************************************************/
 int Incremental_PI(int Encoder, int Target)
 {
 	static float Bias, Pwm, Last_bias;
-	Bias = Encoder - Target;							  // 计算偏差
-	Pwm += 10 * (Bias - Last_bias) / 20 + 10 * Bias / 20; // 增量式PI控制器
-	Last_bias = Bias;									  // 保存上一次偏差
-	return Pwm;											  // 增量输出
+	Bias = Encoder - Target;							  // 锟斤拷锟斤拷偏锟斤拷
+	Pwm += 10 * (Bias - Last_bias) / 20 + 10 * Bias / 20; // 锟斤拷锟斤拷式PI锟斤拷锟斤拷锟斤拷
+	Last_bias = Bias;									  // 锟斤拷锟斤拷锟斤拷一锟斤拷偏锟斤拷
+	return Pwm;											  // 锟斤拷锟斤拷锟斤拷锟?
 }
 
 /**************************************************************************
-函数功能：获取摆杆角度变化率
-入口参数：无
-返回  值：无
-作    者：大轮明王，大隐于市
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷锟斤拷取锟节杆角度变化锟斤拷
+锟斤拷诓锟斤拷锟斤拷锟斤拷锟?
+锟斤拷锟斤拷  值锟斤拷锟斤拷
+锟斤拷    锟竭ｏ拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
 **************************************************************************/
 void Get_D_Angle_Balance(void)
 {
-	if (++D_Count > 5) // 获取角度变化率，积分 时间常数25ms
+	if (++D_Count > 5) // 锟斤拷取锟角度变化锟绞ｏ拷锟斤拷锟斤拷 时锟戒常锟斤拷25ms
 	{
-		D_Angle_Balance = Mean_Filter(Angle_Balance - Last_Angle_Balance); // 平滑滤波得到噪声更小的摆杆角速度信息
-		//			D_Angle_Balance=Angle_Balance-Last_Angle_Balance;	//得到摆杆角速度信息
-		Last_Angle_Balance = Angle_Balance; // 保存历史数据
-		D_Count = 0;						// 清零计数变量
+		D_Angle_Balance = Mean_Filter(Angle_Balance - Last_Angle_Balance); // 平锟斤拷锟剿诧拷锟矫碉拷锟斤拷锟斤拷锟斤拷小锟侥摆杆斤拷锟劫讹拷锟斤拷息
+		//			D_Angle_Balance=Angle_Balance-Last_Angle_Balance;	//锟矫碉拷锟节杆斤拷锟劫讹拷锟斤拷息
+		Last_Angle_Balance = Angle_Balance; // 锟斤拷锟斤拷锟斤拷史锟斤拷锟斤拷
+		D_Count = 0;						// 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟?
 	}
 }
 
 /**************************************************************************
-函数功能：平滑 滤波
-入口参数：速度
-返回  值：滤波后的速度
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷平锟斤拷 锟剿诧拷
+锟斤拷诓锟斤拷锟斤拷锟斤拷俣锟?
+锟斤拷锟斤拷  值锟斤拷锟剿诧拷锟斤拷锟斤拷俣锟?
 **************************************************************************/
 int Mean_Filter(int sensor)
 {
@@ -619,40 +633,40 @@ int Mean_Filter(int sensor)
 }
 
 /**************************************************************************
-函数功能：位置式PID控制器
-入口参数：编码器测量位置信息，目标位置
-返回  值：电机PWM
-根据位置式离散PID公式
-pwm=Kp*e(k)+Ki*∑e(k)+Kd[e（k）-e(k-1)]
-e(k)代表本次偏差
-e(k-1)代表上一次的偏差
-∑e(k)代表e(k)以及之前的偏差的累积和;其中k为1,2,,k;
-pwm代表输出
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷位锟斤拷式PID锟斤拷锟斤拷锟斤拷
+锟斤拷诓锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟轿伙拷锟斤拷锟较?锟斤拷目锟斤拷位锟斤拷
+锟斤拷锟斤拷  值锟斤拷锟斤拷锟絇WM
+锟斤拷锟斤拷位锟斤拷式锟斤拷散PID锟斤拷式
+pwm=Kp*e(k)+Ki*锟斤拷e(k)+Kd[e锟斤拷k锟斤拷-e(k-1)]
+e(k)锟斤拷锟斤拷锟斤拷锟斤拷偏锟斤拷
+e(k-1)锟斤拷锟斤拷锟斤拷一锟轿碉拷偏锟斤拷
+锟斤拷e(k)锟斤拷锟斤拷e(k)锟皆硷拷之前锟斤拷偏锟斤拷锟斤拷刍锟斤拷锟?;锟斤拷锟斤拷k为1,2,,k;
+pwm锟斤拷锟斤拷锟斤拷锟?
 **************************************************************************/
 int Position_PID(int Encoder, int Target)
 {
 
 	Position_Least = Encoder - Target; //===
 	Position_Bias *= 0.8;
-	Position_Bias += Position_Least * 0.2; //===一阶低通滤波器
+	Position_Bias += Position_Least * 0.2; //===一锟阶碉拷通锟剿诧拷锟斤拷
 	Position_Differential = Position_Bias - Last_Position;
 	Last_Position = Position_Bias;
-	Position_PWM = Position_Bias * Position_KP + Position_Differential * Position_KD; //===速度控制
+	Position_PWM = Position_Bias * Position_KP + Position_Differential * Position_KD; //===锟劫度匡拷锟斤拷
 	return Position_PWM;
 }
 
 /**************************************************************************
-函数功能：顺序位置PD控制
-入口参数：编码器
-返回  值：位置控制PWM
-作    者：平衡小车之家
+锟斤拷锟斤拷锟斤拷锟杰ｏ拷顺锟斤拷位锟斤拷PD锟斤拷锟斤拷
+锟斤拷诓锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟?
+锟斤拷锟斤拷  值锟斤拷位锟矫匡拷锟斤拷PWM
+锟斤拷    锟竭ｏ拷平锟斤拷小锟斤拷之锟斤拷
 **************************************************************************/
 int Pre_Position(int Encoder)
 {
 	static float Position_PWM, Last_Position, Position_Bias, Position_Differential;
-	Position_Bias = Encoder - Position_Zero;						 //===得到偏差
-	Position_Differential = Position_Bias - Last_Position;			 // 偏差微分
-	Last_Position = Position_Bias;									 // 保存上一次偏差
-	Position_PWM = Position_Bias * 25 + Position_Differential * 600; //===位置控制
-	return Position_PWM;											 // 返回值
+	Position_Bias = Encoder - Position_Zero;						 //===锟矫碉拷偏锟斤拷
+	Position_Differential = Position_Bias - Last_Position;			 // 偏锟斤拷微锟斤拷
+	Last_Position = Position_Bias;									 // 锟斤拷锟斤拷锟斤拷一锟斤拷偏锟斤拷
+	Position_PWM = Position_Bias * 25 + Position_Differential * 600; //===位锟矫匡拷锟斤拷
+	return Position_PWM;											 // 锟斤拷锟斤拷值
 }
