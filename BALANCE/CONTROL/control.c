@@ -201,8 +201,7 @@ int UAS_SMC_Control(float theta, int pos)
 	s2[0] = theta_e + 1.5f * theta_e_dot;
 	s2[1] = theta_e + (1.0f / 6.0f) * theta_e_dot;
 
-	// [修复 Bug 1 - 方案A] 去掉绝对值 fabsf()，保留方向性，避免单侧累积误差推倒小车
-	N = k1 * pos_e + k2 * theta_e;
+	N = k1 * fabsf(pos_e) + k2 * fabsf(theta_e);
 
 	if (s1[0] < 0 && s1[1] < 0)
 		m1[0] = k11[0], m1[1] = k12[0];
